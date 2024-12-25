@@ -1,6 +1,55 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.svm import SVC
+
+class BreastMNISTSVM:
+    """
+    Support Vector Machine (SVM) for BreastMNIST binary classification.
+    """
+    def __init__(self, C=1.0, kernel='linear'):
+        """
+        Initialize the SVM model.
+
+        Args:
+            C (float): Regularization parameter.
+            kernel (str): Kernel type ('linear', 'rbf', etc.).
+        """
+        self.model = SVC(C=C, kernel=kernel, probability=True)
+
+    def fit(self, X_train, y_train):
+        """
+        Train the SVM model.
+
+        Args:
+            X_train (numpy.ndarray): Training features.
+            y_train (numpy.ndarray): Training labels.
+        """
+        self.model.fit(X_train, y_train)
+
+    def predict(self, X):
+        """
+        Predict labels using the trained SVM model.
+
+        Args:
+            X (numpy.ndarray): Input features.
+
+        Returns:
+            numpy.ndarray: Predicted labels.
+        """
+        return self.model.predict(X)
+
+    def predict_proba(self, X):
+        """
+        Predict probabilities using the trained SVM model.
+
+        Args:
+            X (numpy.ndarray): Input features.
+
+        Returns:
+            numpy.ndarray: Predicted probabilities.
+        """
+        return self.model.predict_proba(X)
 
 class BreastMNISTCNN(nn.Module):
     """
@@ -51,11 +100,3 @@ class BreastMNISTCNN(nn.Module):
         x = self.dropout(x)
         x = self.fc2(x)
         return x
-
-if __name__ == "__main__":
-    # Test the model
-    model = BreastMNISTCNN()
-    print(model)
-    dummy_input = torch.randn(4, 1, 28, 28)  # Batch size 4, grayscale image 28x28
-    output = model(dummy_input)
-    print(f"Output shape: {output.shape}")

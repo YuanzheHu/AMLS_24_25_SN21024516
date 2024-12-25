@@ -20,6 +20,8 @@ from A.task_a_model import BreastMNISTCNN
 from tqdm.auto import tqdm
 from timeit import default_timer as timer
 
+from A.task_a_model import BreastMNISTSVM
+
 def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.001, save_dir="models"):
     """
     Train the CNN model with progress bar, time measurement, and model saving.
@@ -241,3 +243,49 @@ def plot_confusion_matrix(y_true, y_pred, save_dir="figure", file_name="confusio
     figure_path = os.path.join(save_path, file_name)
     plt.savefig(figure_path)
     print(f"Confusion matrix saved to {figure_path}")
+
+def train_svm(X_train, y_train, X_val, y_val, C=1.0, kernel='linear'):
+    """
+    Train an SVM model for BreastMNIST.
+
+    Args:
+        X_train (numpy.ndarray): Flattened training features.
+        y_train (numpy.ndarray): Training labels.
+        X_val (numpy.ndarray): Validation features.
+        y_val (numpy.ndarray): Validation labels.
+        C (float): Regularization parameter.
+        kernel (str): Kernel type ('linear', 'rbf', etc.).
+
+    Returns:
+        BreastMNISTSVM: Trained SVM model.
+    """
+    model = BreastMNISTSVM(C=C, kernel=kernel)
+    model.fit(X_train, y_train)
+
+    # Evaluate on validation set
+    val_accuracy = model.model.score(X_val, y_val)
+    print(f"Validation Accuracy: {val_accuracy:.4f}")
+
+    return model
+
+def test_traditional_model(model, X_test, y_test, class_names=["Benign", "Malignant"]):
+    """
+    Test a traditional ML model and generate a classification report.
+
+    Args:
+        model: Trained traditional ML model (e.g., SVM).
+        X_test (numpy.ndarray): Test features.
+        y_test (numpy.ndarray): Test labels.
+        class_names (list): Class names for the report and confusion matrix.
+
+    Returns:
+        tuple: (y_true, y_pred)
+    """
+    # Predict labels
+    y_pred = model.predict(X_test)
+
+    # Generate and print classification report
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred, target_names=class_names))
+
+    return y_test, y_pred

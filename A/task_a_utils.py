@@ -4,6 +4,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 import medmnist
 from medmnist import INFO
+import numpy as np
 
 def load_breastmnist(batch_size=32, download=True):
     """
@@ -37,3 +38,43 @@ def load_breastmnist(batch_size=32, download=True):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
+
+def load_breastmnist_flat(batch_size=32, download=True):
+    """
+    Load the BreastMNIST dataset and flatten features for traditional ML models.
+
+    Args:
+        batch_size (int): Number of samples per batch.
+        download (bool): Whether to download the dataset.
+
+    Returns:
+        tuple: (X_train, y_train), (X_val, y_val), (X_test, y_test)
+    """
+    train_loader, val_loader, test_loader = load_breastmnist(batch_size, download)
+
+    def flatten(loader):
+        """
+        Flatten all batches of data in a DataLoader.
+
+        Args:
+            loader (DataLoader): PyTorch DataLoader object.
+
+        Returns:
+            tuple: (flattened_features, labels)
+        """
+        X, y = [], []
+        for inputs, labels in loader:
+            # Flatten inputs and convert to NumPy
+            flattened_inputs = inputs.view(inputs.size(0), -1).cpu().numpy()
+            labels_np = labels.cpu().numpy().ravel()  # Ensure y is 1D
+            X.append(flattened_inputs)
+            y.append(labels_np)
+
+        # Concatenate along the first dimension
+        return np.concatenate(X, axis=0), np.concatenate(y, axis=0)
+
+    X_train, y_train = flatten(train_loader)
+    X_val, y_val = flatten(val_loader)
+    X_test, y_test = flatten(test_loader)
+
+    return (X_train, y_train), (X_val, y_val), (X_test, y_test)
