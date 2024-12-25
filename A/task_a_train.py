@@ -6,6 +6,8 @@ Functions:
     - load_model
     - test_model
     - plot_confusion_matrix
+    - train_svm
+    - test_traditional_model
 """
 
 import os

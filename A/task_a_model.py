@@ -51,18 +51,22 @@ class BreastMNISTSVM:
         """
         return self.model.predict_proba(X)
 
+import torch.nn as nn
+import torch.nn.functional as F
+
 class BreastMNISTCNN(nn.Module):
     """
     CNN model for BreastMNIST binary classification.
     """
 
-    def __init__(self, input_channels=1, num_classes=2):
+    def __init__(self, input_channels=1, num_classes=2, hidden_units=128):
         """
         Initialize the CNN model.
 
         Args:
             input_channels (int): Number of input channels (default: 1 for grayscale images).
             num_classes (int): Number of output classes (default: 2 for binary classification).
+            hidden_units (int): Number of units in the first fully connected layer.
         """
         super(BreastMNISTCNN, self).__init__()
         # Convolutional layers
@@ -71,8 +75,8 @@ class BreastMNISTCNN(nn.Module):
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
 
         # Fully connected layers
-        self.fc1 = nn.Linear(128 * 3 * 3, 128)  # Assuming input image size is 28x28
-        self.fc2 = nn.Linear(128, num_classes)
+        self.fc1 = nn.Linear(128 * 3 * 3, hidden_units)  # Adjust according to hidden_units
+        self.fc2 = nn.Linear(hidden_units, num_classes)
 
         # Pooling and dropout
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)

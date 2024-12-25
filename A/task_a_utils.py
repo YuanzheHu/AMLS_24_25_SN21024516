@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader
 import medmnist
 from medmnist import INFO
 import numpy as np
+import json
+from datetime import datetime
 
 def load_breastmnist(batch_size=32, download=True):
     """
@@ -78,3 +80,38 @@ def load_breastmnist_flat(batch_size=32, download=True):
     X_test, y_test = flatten(test_loader)
 
     return (X_train, y_train), (X_val, y_val), (X_test, y_test)
+
+def save_training_log(params, report, save_dir="logs", file_name="training_log.json"):
+    """
+    Save training logs including hyperparameters and classification report.
+
+    Args:
+        params (dict): Hyperparameters and configuration details.
+        report (dict): Classification report or other evaluation metrics.
+        save_dir (str): Directory to save the log file.
+        file_name (str): File name for the log file.
+    """
+    # Ensure save directory exists
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # Add timestamp to the log
+    params["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    params["classification_report"] = report
+
+    # Log file path
+    log_path = os.path.join(save_dir, file_name)
+
+    # Append to log file if it exists
+    if os.path.exists(log_path):
+        with open(log_path, "r") as f:
+            logs = json.load(f)
+    else:
+        logs = []
+
+    logs.append(params)
+
+    with open(log_path, "w") as f:
+        json.dump(logs, f, indent=4)
+    
+    print(f"Training log saved to {log_path}")
