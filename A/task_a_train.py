@@ -1,11 +1,21 @@
+"""
+Module : A.task_a_train
+Functions:
+    - train_model
+    - plot_history
+    - load_model
+    - test_model
+    - plot_confusion_matrix
+"""
+
 import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
-from task_a_utils import load_breastmnist
-from task_a_model import BreastMNISTCNN
+from A.task_a_utils import load_breastmnist
+from A.task_a_model import BreastMNISTCNN
 
 from tqdm.auto import tqdm
 from timeit import default_timer as timer
@@ -161,30 +171,26 @@ def load_model(model, model_path, device):
     Returns:
         model: Model with loaded weights.
     """
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model = model.to(device)
     print(f"Model loaded from {model_path}")
     return model
 
-def test_model(model, test_loader, device, save_dir="figure", file_name="confusion_matrix.png"):
+
+def test_model(model, test_loader, device):
     """
-    Test the CNN model and save the confusion matrix.
+    Test the CNN model and generate a classification report.
 
     Args:
         model (nn.Module): Trained CNN model.
         test_loader (DataLoader): Test data loader.
         device (torch.device): Device to test the model on.
-        save_dir (str): Directory to save the confusion matrix image.
-        file_name (str): File name for the confusion matrix image.
+
+    Returns:
+        tuple: (y_true, y_pred)
     """
     model.eval()
     y_true, y_pred = [], []
-
-    # Create save directory if it does not exist
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    save_path = os.path.join(current_dir, save_dir)
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
 
     with torch.no_grad():
         for inputs, labels in test_loader:
@@ -194,38 +200,44 @@ def test_model(model, test_loader, device, save_dir="figure", file_name="confusi
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(predicted.cpu().numpy())
 
-    # Classification report
+    # Generate and print classification report
     print("\nClassification Report:")
-    print(classification_report(y_true, y_pred, target_names=["Benign", "Malignant"]))
+    report = classification_report(
+        y_true, y_pred, target_names=["Benign", "Malignant"]
+    )
+    print(report)
 
-    # Confusion matrix
+    return y_true, y_pred
+
+def plot_confusion_matrix(y_true, y_pred, save_dir="figure", file_name="confusion_matrix.png", class_names=["Benign", "Malignant"]):
+    """
+    Plot and save the confusion matrix.
+
+    Args:
+        y_true (list): True labels.
+        y_pred (list): Predicted labels.
+        save_dir (str): Directory to save the confusion matrix image.
+        file_name (str): File name for the confusion matrix image.
+        class_names (list): List of class names for the confusion matrix.
+    """
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+    import matplotlib.pyplot as plt
+    import os
+
+    # Compute the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Benign", "Malignant"])
+
+    # Plot the confusion matrix
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
     disp.plot(cmap=plt.cm.Blues)
+
+    # Ensure save directory exists
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    save_path = os.path.join(current_dir, save_dir)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
     # Save the confusion matrix figure
     figure_path = os.path.join(save_path, file_name)
     plt.savefig(figure_path)
     print(f"Confusion matrix saved to {figure_path}")
-
-    # Optional: Show the confusion matrix
-    plt.show(block=False)
-
-if __name__ == "__main__":
-    # Load data with data augmentation and normalization
-    train_loader, val_loader, test_loader = load_breastmnist(batch_size=32)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Initialize model
-    model = BreastMNISTCNN()
-
-    # Load or train model
-    model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "best_model.pth")
-    if os.path.exists(model_path):
-        model = load_model(model, model_path, device)
-    else:
-        model, history = train_model(model, train_loader, val_loader, device, epochs=10, lr=0.001)
-        plot_history(history, save_dir="figure", file_name="training_history.png")
-
-    # Test the model
-    test_model(model, test_loader, device, save_dir="figure", file_name="confusion_matrix.png")

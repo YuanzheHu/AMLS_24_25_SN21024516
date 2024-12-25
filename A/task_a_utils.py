@@ -37,10 +37,3 @@ def load_breastmnist(batch_size=32, download=True):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
-
-if __name__ == "__main__":
-    # Test the data loading
-    train_loader, val_loader, test_loader = load_breastmnist()
-    print(f"Train Loader Size: {len(train_loader)}")
-    print(f"Validation Loader Size: {len(val_loader)}")
-    print(f"Test Loader Size: {len(test_loader)}")

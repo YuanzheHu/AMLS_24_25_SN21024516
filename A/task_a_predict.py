@@ -3,9 +3,9 @@ import torch
 import matplotlib.pyplot as plt
 import os
 
-from task_a_utils import load_breastmnist
-from task_a_model import BreastMNISTCNN
-from task_a_train import load_model
+from A.task_a_utils import load_breastmnist
+from A.task_a_model import BreastMNISTCNN
+from A.task_a_train import load_model
 
 def predict_and_visualize(model, test_loader, device, class_names=["Benign", "Malignant"], num_samples=9, save_dir="figure", save_file="predictions.png"):
     """
@@ -55,26 +55,13 @@ def predict_and_visualize(model, test_loader, device, class_names=["Benign", "Ma
 
     plt.tight_layout()
 
+    # Ensure save directory exists
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    save_path = os.path.join(current_dir, save_dir)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
     # Save the figure
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    save_path = os.path.join(save_dir, save_file)
-    plt.savefig(save_path)
-    print(f"Prediction visualization saved to {save_path}")
-
-if __name__ == "__main__":
-    # Load data
-    _, _, test_loader = load_breastmnist(batch_size=32)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Load model
-    model = BreastMNISTCNN()
-    model_path = "models/best_model.pth"
-    model = load_model(model, model_path, device)
-
-    # Predict and visualize
-    predict_and_visualize(model, test_loader, device, save_dir="figure", save_file="predictions.png")
-
-    # Exit program
-    import sys
-    sys.exit(0)
+    figure_path = os.path.join(save_path, save_file)
+    plt.savefig(figure_path)
+    print(f"Prediction visualization saved to {figure_path}")
