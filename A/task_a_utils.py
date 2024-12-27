@@ -3,25 +3,24 @@ import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 import medmnist
-from medmnist import INFO
+from medmnist import INFO,BreastMNIST
 import numpy as np
-import json
 from datetime import datetime
 
-def load_breastmnist(batch_size=32, download=True):
+def load_breastmnist(batch_size=32, download=True, data_dir="data"):
     """
-    Load the BreastMNIST dataset without data augmentation.
+    Load the BreastMNIST dataset without data augmentation and save to a specified directory.
 
     Args:
         batch_size (int): Batch size for DataLoader.
         download (bool): Whether to download the dataset.
+        data_dir (str): Directory to save the dataset.
 
     Returns:
         tuple: Train, validation, and test DataLoaders.
     """
-    dataset_name = 'breastmnist'
-    info = INFO[dataset_name]
-    DataClass = getattr(medmnist, info['python_class'])
+    # Ensure data directory exists
+    os.makedirs(data_dir, exist_ok=True)
 
     # Simple normalization for all datasets
     transform = transforms.Compose([
@@ -30,9 +29,51 @@ def load_breastmnist(batch_size=32, download=True):
     ])
 
     # Load datasets
-    train_dataset = DataClass(split='train', transform=transform, download=download)
-    val_dataset = DataClass(split='val', transform=transform, download=download)
-    test_dataset = DataClass(split='test', transform=transform, download=download)
+    train_dataset = BreastMNIST(split='train', transform=transform, download=download, root=data_dir)
+    val_dataset = BreastMNIST(split='val', transform=transform, download=download, root=data_dir)
+    test_dataset = BreastMNIST(split='test', transform=transform, download=download, root=data_dir)
+
+    # Create DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    return train_loader, val_loader, test_loader
+
+def load_breastmnist_augmented(batch_size=32, download=True, data_dir="data"):
+    """
+    Load the BreastMNIST dataset with data augmentation and save to a specified directory.
+
+    Args:
+        batch_size (int): Batch size for DataLoader.
+        download (bool): Whether to download the dataset.
+        data_dir (str): Directory to save the dataset.
+
+    Returns:
+        tuple: Train, validation, and test DataLoaders.
+    """
+    # Ensure data directory exists
+    os.makedirs(data_dir, exist_ok=True)
+
+    # Data augmentation for training set
+    transform_train = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation(30),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize to [-1, 1]
+    ])
+
+    # Simple normalization for validation and test sets
+    transform_val_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize to [-1, 1]
+    ])
+
+    # Load datasets
+    train_dataset = BreastMNIST(split='train', transform=transform_train, download=download, root=data_dir)
+    val_dataset = BreastMNIST(split='val', transform=transform_val_test, download=download, root=data_dir)
+    test_dataset = BreastMNIST(split='test', transform=transform_val_test, download=download, root=data_dir)
 
     # Create DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -81,37 +122,46 @@ def load_breastmnist_flat(batch_size=32, download=True):
 
     return (X_train, y_train), (X_val, y_val), (X_test, y_test)
 
-def save_training_log(params, report, save_dir="logs", file_name="training_log.json"):
+def save_training_log_plaintext(hyperparameters, classification_report, augmentation=False, save_dir="A/log", filename="training_log.txt"):
     """
-    Save training logs including hyperparameters and classification report.
+    Save training details and classification report to a plain text file.
 
     Args:
-        params (dict): Hyperparameters and configuration details.
-        report (dict): Classification report or other evaluation metrics.
+        hyperparameters (dict): Hyperparameters and other training details.
+        classification_report (str): Classification report in plain text format.
+        augmentation (bool): Whether data augmentation was used.
         save_dir (str): Directory to save the log file.
-        file_name (str): File name for the log file.
+        filename (str): Name of the log file to save the report.
     """
-    # Ensure save directory exists
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    import os
+    from datetime import datetime
 
-    # Add timestamp to the log
-    params["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    params["classification_report"] = report
+    # Ensure the log directory exists
+    os.makedirs(save_dir, exist_ok=True)
 
-    # Log file path
-    log_path = os.path.join(save_dir, file_name)
+    # Define the log file path
+    log_file = os.path.join(save_dir, filename)
 
-    # Append to log file if it exists
-    if os.path.exists(log_path):
-        with open(log_path, "r") as f:
-            logs = json.load(f)
-    else:
-        logs = []
+    # Prepare log entry
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"""
+Timestamp: {timestamp}
+Data Augmentation: {'Yes' if augmentation else 'No'}
+Task: {hyperparameters.get('task', 'N/A')}
+Model: {hyperparameters.get('model', 'N/A')}
+Kernel: {hyperparameters.get('kernel', 'N/A')}
+Regularization Param: {hyperparameters.get('regularization_param', 'N/A')}
+Num Epochs: {hyperparameters.get('num_epochs', 'N/A')}
+Batch Size: {hyperparameters.get('batch_size', 'N/A')}
+Learning Rate: {hyperparameters.get('learning_rate', 'N/A')}
+Hidden Units: {hyperparameters.get('hidden_units', 'N/A')}
 
-    logs.append(params)
+Classification Report:
+{classification_report}
+"""
+    # Write to the log file
+    with open(log_file, "a") as f:
+        f.write(log_entry)
+        f.write("\n" + "-" * 80 + "\n")  # Add a separator for readability
 
-    with open(log_path, "w") as f:
-        json.dump(logs, f, indent=4)
-    
-    print(f"Training log saved to {log_path}")
+    print(f"Training log saved to {log_file}")
