@@ -107,7 +107,4 @@ def test_model(model, test_loader, device):
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(predicted.cpu().numpy())
 
-    print("\nClassification Report:")
-    print(classification_report(y_true, y_pred, target_names=[str(i) for i in range(8)]))
-
     return y_true, y_pred

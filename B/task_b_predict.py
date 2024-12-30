@@ -1,6 +1,7 @@
 import os
-import matplotlib.pyplot as plt
 import torch
+import matplotlib.pyplot as plt
+import numpy as np
 
 def predict_and_visualize_resnet(model, test_loader, device, save_dir="B/figure", save_file="predictions_resnet.png"):
     """
@@ -40,6 +41,7 @@ def predict_and_visualize_resnet(model, test_loader, device, save_dir="B/figure"
     for idx, ax in enumerate(axes.flat):
         if idx < len(test_samples):
             sample = test_samples[idx].permute(1, 2, 0).numpy()  # Convert to (H, W, C) format
+            sample = np.clip(sample, 0, 1)  # Clip to valid range
             true_label = test_labels[idx].item()
             pred_label = pred_labels[idx].item()
 
