@@ -3,7 +3,7 @@ import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 import medmnist
-from medmnist import INFO,BreastMNIST
+from medmnist import BreastMNIST
 import numpy as np
 from datetime import datetime
 
@@ -19,7 +19,6 @@ def load_breastmnist(batch_size=32, download=True, data_dir="data"):
     Returns:
         tuple: Train, validation, and test DataLoaders.
     """
-    # Ensure data directory exists
     os.makedirs(data_dir, exist_ok=True)
 
     # Simple normalization for all datasets
@@ -52,7 +51,6 @@ def load_breastmnist_augmented(batch_size=32, download=True, data_dir="data"):
     Returns:
         tuple: Train, validation, and test DataLoaders.
     """
-    # Ensure data directory exists
     os.makedirs(data_dir, exist_ok=True)
 
     # Data augmentation for training set
@@ -133,10 +131,6 @@ def save_training_log_plaintext(hyperparameters, classification_report, augmenta
         save_dir (str): Directory to save the log file.
         filename (str): Name of the log file to save the report.
     """
-    import os
-    from datetime import datetime
-
-    # Ensure the log directory exists
     os.makedirs(save_dir, exist_ok=True)
 
     # Define the log file path
@@ -146,7 +140,6 @@ def save_training_log_plaintext(hyperparameters, classification_report, augmenta
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"""
 Timestamp: {timestamp}
-Data Augmentation: {'Yes' if augmentation else 'No'}
 Task: {hyperparameters.get('task', 'N/A')}
 Model: {hyperparameters.get('model', 'N/A')}
 Kernel: {hyperparameters.get('kernel', 'N/A')}

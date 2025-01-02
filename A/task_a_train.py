@@ -1,15 +1,3 @@
-"""
-Module : A.task_a_train
-Functions:
-    - train_model
-    - plot_history
-    - load_model
-    - test_model
-    - plot_confusion_matrix
-    - train_svm
-    - test_traditional_model
-"""
-
 import os
 import torch
 import torch.nn as nn
@@ -17,10 +5,17 @@ import torch.optim as optim
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 from A.task_a_utils import load_breastmnist
-from A.task_a_model import BreastMNISTCNN
+import matplotlib.pyplot as plt
 
 from tqdm.auto import tqdm
 from timeit import default_timer as timer
+
+from sklearn.model_selection import GridSearchCV
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report
+from sklearn.svm import SVC
+import joblib
 
 from A.task_a_model import BreastMNISTSVM
 
@@ -106,13 +101,6 @@ def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.001, sa
         history["val_acc"].append(val_acc)
 
         print(f"Epoch {epoch + 1} - Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
-
-        # Save the model if validation accuracy improves
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            model_path = os.path.join(save_path, "best_model.pth")
-            torch.save(model.state_dict(), model_path)
-            print(f"Model saved to {model_path}")
 
     # End training timer
     end_time = timer()
@@ -226,7 +214,6 @@ def plot_confusion_matrix(y_true, y_pred, save_dir="figure", file_name="confusio
     """
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     import matplotlib.pyplot as plt
-    import os
 
     # Compute the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
@@ -246,29 +233,112 @@ def plot_confusion_matrix(y_true, y_pred, save_dir="figure", file_name="confusio
     plt.savefig(figure_path)
     print(f"Confusion matrix saved to {figure_path}")
 
-def train_svm(X_train, y_train, X_val, y_val, C=1.0, kernel='linear'):
+def preprocess_data(X_train, X_val, X_test, n_components=20):
     """
-    Train an SVM model for BreastMNIST.
+    Standardize the data and reduce dimensionality using PCA.
 
     Args:
-        X_train (numpy.ndarray): Flattened training features.
-        y_train (numpy.ndarray): Training labels.
+        X_train (numpy.ndarray): Training features.
         X_val (numpy.ndarray): Validation features.
-        y_val (numpy.ndarray): Validation labels.
-        C (float): Regularization parameter.
-        kernel (str): Kernel type ('linear', 'rbf', etc.).
+        X_test (numpy.ndarray): Test features.
+        n_components (int): Number of PCA components.
 
     Returns:
-        BreastMNISTSVM: Trained SVM model.
+        tuple: Transformed (X_train, X_val, X_test), scaler and PCA objects.
     """
-    model = BreastMNISTSVM(C=C, kernel=kernel)
-    model.fit(X_train, y_train)
+    # Standardize the data
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_val = scaler.transform(X_val)
+    X_test = scaler.transform(X_test)
 
-    # Evaluate on validation set
-    val_accuracy = model.model.score(X_val, y_val)
+    # Reduce dimensions with PCA
+    pca = PCA(n_components=n_components)
+    X_train = pca.fit_transform(X_train)
+    X_val = pca.transform(X_val)
+    X_test = pca.transform(X_test)
+
+    return X_train, X_val, X_test, scaler, pca
+
+
+def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/models/best_svm_model.pkl"):
+    """
+    Train an SVM model using GridSearchCV or load the best model if it exists.
+
+    Args:
+        X_train (numpy.ndarray): Preprocessed training features.
+        y_train (numpy.ndarray): Training labels.
+        X_val (numpy.ndarray): Preprocessed validation features.
+        y_val (numpy.ndarray): Validation labels.
+        model_path (str): Path to save/load the best model.
+
+    Returns:
+        SVC: Best-trained SVM model.
+        dict: Best parameters found or loaded.
+    """
+    if os.path.exists(model_path):
+        # Load the existing model
+        print(f"Loading saved SVM model from {model_path}...")
+        best_model = joblib.load(model_path)
+        best_params = best_model.get_params()
+        return best_model, best_params
+
+    print("No saved model found. Training a new SVM model...")
+
+    # Define a reduced parameter grid for faster search
+    param_grid = {
+        'C': [0.1, 1, 10],
+        'kernel': ['linear', 'rbf'],
+        'gamma': ['scale', 'auto']
+    }
+
+    # Initialize progress bar
+    param_combinations = [
+        {'C': c, 'kernel': k, 'gamma': g}
+        for c in param_grid['C']
+        for k in param_grid['kernel']
+        for g in param_grid['gamma']
+    ]
+    total_combinations = len(param_combinations)
+    progress_bar = tqdm(total=total_combinations * 5, desc="GridSearchCV Progress")  # 5 是 CV 折数
+
+    # Train using GridSearchCV
+    best_score = 0
+    best_params = None
+    best_model = None
+    for params in param_combinations:
+        svc = SVC(probability=True, **params)
+        grid_search = GridSearchCV(
+            svc,
+            param_grid={},
+            scoring='accuracy',
+            cv=5,
+            n_jobs=1,
+            verbose=0
+        )
+        grid_search.fit(X_train, y_train)
+        score = grid_search.best_score_
+
+        if score > best_score:
+            best_score = score
+            best_params = params
+            best_model = grid_search.best_estimator_
+
+        progress_bar.update(5)
+    progress_bar.close()
+
+    # Save the best model
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    joblib.dump(best_model, model_path)
+    print(f"Best model saved to {model_path}")
+
+    # Validation accuracy
+    val_accuracy = best_model.score(X_val, y_val)
+    print(f"Best Parameters: {best_params}")
     print(f"Validation Accuracy: {val_accuracy:.4f}")
 
-    return model
+    return best_model, best_params
+
 
 def test_traditional_model(model, X_test, y_test, class_names=["Benign", "Malignant"]):
     """
@@ -278,16 +348,11 @@ def test_traditional_model(model, X_test, y_test, class_names=["Benign", "Malign
         model: Trained traditional ML model (e.g., SVM).
         X_test (numpy.ndarray): Test features.
         y_test (numpy.ndarray): Test labels.
-        class_names (list): Class names for the report and confusion matrix.
+        class_names (list): Class names for the report.
 
     Returns:
         tuple: (y_true, y_pred)
     """
     # Predict labels
     y_pred = model.predict(X_test)
-
-    # Generate and print classification report
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred, target_names=class_names))
-
     return y_test, y_pred

@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.svm import SVC
@@ -50,10 +49,6 @@ class BreastMNISTSVM:
             numpy.ndarray: Predicted probabilities.
         """
         return self.model.predict_proba(X)
-
-import torch.nn as nn
-import torch.nn.functional as F
-
 class BreastMNISTCNN(nn.Module):
     """
     CNN model for BreastMNIST binary classification.
