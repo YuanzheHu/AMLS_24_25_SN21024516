@@ -2,22 +2,74 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
-from A.task_a_utils import load_breastmnist
-import matplotlib.pyplot as plt
-
+from itertools import product
 from tqdm.auto import tqdm
 from timeit import default_timer as timer
-
-from sklearn.model_selection import GridSearchCV
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report
-from sklearn.svm import SVC
 import joblib
+from sklearn.model_selection import GridSearchCV
+from sklearn.svm import SVC
+from A.task_a_model import BreastMNISTCNN, BreastMNISTSVM
 
-from A.task_a_model import BreastMNISTSVM
+def train_cnn_with_hyperparameters(train_loader, val_loader, device, hyperparam_space, model_path):
+    """
+    Train CNN with hyperparameter tuning.
+
+    Args:
+        train_loader (DataLoader): Training data loader.
+        val_loader (DataLoader): Validation data loader.
+        device (torch.device): Device to train the model on.
+        hyperparam_space (dict): Hyperparameter space to search.
+        model_path (str): Path to save the best model.
+
+    Returns:
+        nn.Module: Best-trained model.
+        dict: Best hyperparameter combination.
+        dict: Training history of the best model.
+        float: Best validation accuracy achieved.
+    """
+    best_val_acc = 0.0
+    best_model = None
+    best_params = None
+    best_history = None
+
+    # Generate all combinations of hyperparameters
+    hyperparam_combinations = [
+        {k: v for k, v in zip(hyperparam_space.keys(), values)}
+        for values in product(*hyperparam_space.values())
+    ]
+
+    for params in hyperparam_combinations:
+        print(f"Testing combination: {params}")
+        model = BreastMNISTCNN(
+            hidden_units=params["hidden_units"],
+            dropout=params["dropout"]
+        ).to(device)
+
+        # Train the model
+        model, history = train_model(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            device=device,
+            epochs=params["num_epochs"],
+            lr=params["learning_rate"]
+        )
+
+        # Evaluate validation accuracy
+        val_acc = max(history["val_acc"])
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            best_model = model
+            best_params = params
+            best_history = history
+
+    # Save the best model
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    torch.save(best_model.state_dict(), model_path)
+    print(f"Best model saved to {model_path} with validation accuracy: {best_val_acc:.4f}")
+
+    return best_model, best_params, best_history, best_val_acc
 
 def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.001, save_dir="models"):
     """
@@ -151,7 +203,6 @@ def plot_history(history, save_dir="figure", file_name="training_history.png"):
     plt.savefig(figure_path)
     print(f"Figure saved to {figure_path}")
 
-def load_model(model, model_path, device):
     """
     Load a trained model from file.
 
@@ -167,7 +218,6 @@ def load_model(model, model_path, device):
     model = model.to(device)
     print(f"Model loaded from {model_path}")
     return model
-
 
 def test_model(model, test_loader, device):
     """
@@ -191,13 +241,6 @@ def test_model(model, test_loader, device):
             _, predicted = torch.max(outputs, 1)
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(predicted.cpu().numpy())
-
-    # Generate and print classification report
-    print("\nClassification Report:")
-    report = classification_report(
-        y_true, y_pred, target_names=["Benign", "Malignant"]
-    )
-    print(report)
 
     return y_true, y_pred
 
@@ -233,37 +276,38 @@ def plot_confusion_matrix(y_true, y_pred, save_dir="figure", file_name="confusio
     plt.savefig(figure_path)
     print(f"Confusion matrix saved to {figure_path}")
 
-def preprocess_data(X_train, X_val, X_test, n_components=20):
+def load_best_cnn_model(model_path, device):
     """
-    Standardize the data and reduce dimensionality using PCA.
+    Load the best CNN model from the saved checkpoint with dimension matching.
 
     Args:
-        X_train (numpy.ndarray): Training features.
-        X_val (numpy.ndarray): Validation features.
-        X_test (numpy.ndarray): Test features.
-        n_components (int): Number of PCA components.
+        model_path (str): Path to the saved model.
+        device (torch.device): Device to load the model on.
 
     Returns:
-        tuple: Transformed (X_train, X_val, X_test), scaler and PCA objects.
+        torch.nn.Module: Loaded CNN model.
     """
-    # Standardize the data
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_val = scaler.transform(X_val)
-    X_test = scaler.transform(X_test)
+    checkpoint = torch.load(model_path, map_location=device)
+    state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
 
-    # Reduce dimensions with PCA
-    pca = PCA(n_components=n_components)
-    X_train = pca.fit_transform(X_train)
-    X_val = pca.transform(X_val)
-    X_test = pca.transform(X_test)
+    # Extract dimensions from the state_dict
+    fc1_weight_shape = state_dict["fc1.weight"].shape  # e.g., torch.Size([256, 1152])
+    fc2_weight_shape = state_dict["fc2.weight"].shape  # e.g., torch.Size([2, 256])
 
-    return X_train, X_val, X_test, scaler, pca
+    # Get the number of hidden units from fc1's output size
+    hidden_units = fc1_weight_shape[0]
 
+    # Initialize the model with the extracted dimensions
+    best_model = BreastMNISTCNN(hidden_units=hidden_units, dropout=0.5).to(device)
 
-def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/models/best_svm_model.pkl"):
+    # Load the state_dict into the model
+    best_model.load_state_dict(state_dict)
+    print(f"Model loaded successfully with hidden_units={hidden_units}")
+    return best_model
+
+def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/models/best_svm_model.pkl", param_grid=None):
     """
-    Train an SVM model using GridSearchCV or load the best model if it exists.
+    Train an SVM model using custom parameter grid or load the best model if it exists.
 
     Args:
         X_train (numpy.ndarray): Preprocessed training features.
@@ -271,76 +315,64 @@ def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/mod
         X_val (numpy.ndarray): Preprocessed validation features.
         y_val (numpy.ndarray): Validation labels.
         model_path (str): Path to save/load the best model.
+        param_grid (dict): Parameter grid for hyperparameter search.
 
     Returns:
-        SVC: Best-trained SVM model.
+        BreastMNISTSVM: Best-trained SVM model.
         dict: Best parameters found or loaded.
     """
     if os.path.exists(model_path):
-        # Load the existing model
-        print(f"Loading saved SVM model from {model_path}...")
+        print(f"Pretrained SVM model found. Loading model from {model_path}...")
         best_model = joblib.load(model_path)
-        best_params = best_model.get_params()
+        best_params = best_model.model.get_params()
         return best_model, best_params
 
-    print("No saved model found. Training a new SVM model...")
-
-    # Define a reduced parameter grid for faster search
-    param_grid = {
-        'C': [0.1, 1, 10],
-        'kernel': ['linear', 'rbf'],
-        'gamma': ['scale', 'auto']
-    }
+    print("No pretrained model found. Starting hyperparameter tuning...")
 
     # Initialize progress bar
     param_combinations = [
-        {'C': c, 'kernel': k, 'gamma': g}
+        {'C': c, 'kernel': k, 'gamma': g, 'class_weight': cw}
         for c in param_grid['C']
         for k in param_grid['kernel']
         for g in param_grid['gamma']
+        for cw in param_grid['class_weight']
     ]
     total_combinations = len(param_combinations)
-    progress_bar = tqdm(total=total_combinations * 5, desc="GridSearchCV Progress")  # 5 是 CV 折数
+    progress_bar = tqdm(total=total_combinations, desc="GridSearch Progress")
 
-    # Train using GridSearchCV
     best_score = 0
     best_params = None
     best_model = None
+
     for params in param_combinations:
-        svc = SVC(probability=True, **params)
-        grid_search = GridSearchCV(
-            svc,
-            param_grid={},
-            scoring='accuracy',
-            cv=5,
-            n_jobs=1,
-            verbose=0
-        )
-        grid_search.fit(X_train, y_train)
-        score = grid_search.best_score_
+        print(f"Testing parameters: {params}")
+        current_model = BreastMNISTSVM(C=params['C'], kernel=params['kernel'])
+        current_model.model.gamma = params['gamma']  # Explicitly set gamma
+        current_model.model.class_weight = params['class_weight']  # Set class weight
 
-        if score > best_score:
-            best_score = score
+        # Train the model
+        current_model.fit(X_train, y_train)
+
+        # Evaluate the model
+        val_score = current_model.score(X_val, y_val)
+        print(f"Validation score: {val_score:.4f}")
+
+        if val_score > best_score:
+            best_score = val_score
             best_params = params
-            best_model = grid_search.best_estimator_
+            best_model = current_model
 
-        progress_bar.update(5)
+        progress_bar.update(1)
     progress_bar.close()
 
     # Save the best model
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(best_model, model_path)
-    print(f"Best model saved to {model_path}")
-
-    # Validation accuracy
-    val_accuracy = best_model.score(X_val, y_val)
-    print(f"Best Parameters: {best_params}")
-    print(f"Validation Accuracy: {val_accuracy:.4f}")
+    print(f"Best model saved to {model_path} with validation accuracy: {best_score:.4f}")
 
     return best_model, best_params
 
-
-def test_traditional_model(model, X_test, y_test, class_names=["Benign", "Malignant"]):
+def test_svm(model, X_test, y_test, class_names=["Benign", "Malignant"]):
     """
     Test a traditional ML model and generate a classification report.
 

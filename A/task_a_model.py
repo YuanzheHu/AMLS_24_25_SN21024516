@@ -49,12 +49,26 @@ class BreastMNISTSVM:
             numpy.ndarray: Predicted probabilities.
         """
         return self.model.predict_proba(X)
+
+    def score(self, X, y):
+        """
+        Calculate the accuracy of the model.
+
+        Args:
+            X (numpy.ndarray): Test features.
+            y (numpy.ndarray): True labels.
+
+        Returns:
+            float: Accuracy score.
+        """
+        return self.model.score(X, y)
+
 class BreastMNISTCNN(nn.Module):
     """
-    CNN model for BreastMNIST binary classification.
+    CNN model for BreastMNIST binary classification with dropout regularization.
     """
 
-    def __init__(self, input_channels=1, num_classes=2, hidden_units=128):
+    def __init__(self, input_channels=1, num_classes=2, hidden_units=128, dropout=0.5):
         """
         Initialize the CNN model.
 
@@ -62,8 +76,10 @@ class BreastMNISTCNN(nn.Module):
             input_channels (int): Number of input channels (default: 1 for grayscale images).
             num_classes (int): Number of output classes (default: 2 for binary classification).
             hidden_units (int): Number of units in the first fully connected layer.
+            dropout (float): Dropout probability for regularization (default: 0.5).
         """
         super(BreastMNISTCNN, self).__init__()
+
         # Convolutional layers
         self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
@@ -73,9 +89,9 @@ class BreastMNISTCNN(nn.Module):
         self.fc1 = nn.Linear(128 * 3 * 3, hidden_units)  # Adjust according to hidden_units
         self.fc2 = nn.Linear(hidden_units, num_classes)
 
-        # Pooling and dropout
+        # Pooling, dropout, and activation
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.dropout = nn.Dropout(p=0.5)
+        self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
         """
@@ -96,6 +112,6 @@ class BreastMNISTCNN(nn.Module):
 
         x = x.view(x.size(0), -1)  # Flatten
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)
+        x = self.dropout(x)  # Apply dropout
         x = self.fc2(x)
         return x

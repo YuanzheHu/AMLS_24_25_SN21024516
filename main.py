@@ -1,30 +1,28 @@
 import os
 import torch
+import joblib
 from datetime import datetime
-from itertools import product
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import classification_report
 from A.task_a_utils import (
-    load_breastmnist, load_breastmnist_flat, save_training_log_plaintext
+    load_breastmnist, load_breastmnist_flat, preprocess_data, save_svm_log, save_cnn_log
 )
-from A.task_a_model import BreastMNISTCNN
 from A.task_a_train import (
-    train_model, plot_history, test_model, plot_confusion_matrix,
-    train_svm_with_grid_search, test_traditional_model, preprocess_data
+    plot_history, test_model, plot_confusion_matrix, train_cnn_with_hyperparameters,load_best_cnn_model,
+    train_svm_with_grid_search, test_svm
 )
-from A.task_a_predict import predict_and_visualize
+from A.task_a_predict import predict_and_visualize, plot_roc_auc
+
 from B.task_b_utils import load_bloodmnist, log_message, generate_classification_report, plot_and_save_confusion_matrix
 from B.task_b_model import get_resnet_model
 from B.task_b_train import train_model as train_resnet_model, test_model as test_resnet_model
 from B.task_b_predict import predict_and_visualize_resnet
-import matplotlib.pyplot as plt
-
 
 # Default Hyperparameters
 NUM_EPOCHS = 10
 BATCH_SIZE = 32
 HIDDEN_UNITS = 128
 LEARNING_RATE = 0.001
-N_COMPONENTS = 20  # PCA components for SVM
+N_COMPONENTS = 15  # PCA components for SVM
 
 
 def setup_directories():
@@ -32,8 +30,10 @@ def setup_directories():
     for directory in ["data", "A/models", "A/figure", "A/log", "B/models", "B/figure", "B/log"]:
         os.makedirs(directory, exist_ok=True)
 
-def handle_task_a_cnn():
-    """Workflow for CNN model with hyperparameter tuning and model loading."""
+def handle_task_a_cnn():    
+    """
+    Workflow for CNN model with hyperparameter tuning and model loading.
+    """
     try:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {device}")
@@ -44,114 +44,167 @@ def handle_task_a_cnn():
 
         # Define model path
         model_path = "A/models/best_cnn_model.pth"
-        hyperparam_path = "A/models/best_cnn_hyperparams.pth"
-
-        best_val_acc = 0.0
-        best_model_state = None
-        best_params = None  # Initialize to ensure it is always defined
-        best_history = None
+        log_path = "A/log/log.txt"
 
         # Check if pretrained model exists
-        if os.path.exists(model_path) and os.path.exists(hyperparam_path):
+        if os.path.exists(model_path):
             print(f"Pretrained model found. Loading model from {model_path}...")
-
-            # Load hyperparameters and model
-            saved_hyperparams = torch.load(hyperparam_path)
-            hidden_units = saved_hyperparams["hidden_units"]
-            print(f"Loaded hyperparameters: {saved_hyperparams}")
-
-            model = BreastMNISTCNN(hidden_units=hidden_units).to(device)
-            model.load_state_dict(torch.load(model_path, map_location=device))
-            model.eval()
+            best_model = load_best_cnn_model(model_path, device)
+            best_model.eval()
             print("Model loaded successfully!")
         else:
             print("No pretrained model found. Starting hyperparameter tuning...")
 
             # Define hyperparameter space
-            hyperparam_space = product([64, 128, 256], [0.001, 0.0005, 0.0001], [10, 20])
+            hyperparam_space = {
+                "hidden_units": [64, 128, 256],
+                "learning_rate": [0.001, 0.0005, 0.0001],
+                "num_epochs": [10, 20],
+                "dropout": [0.3, 0.5]  # Regularization option
+            }
 
-            # Perform hyperparameter tuning
-            for hidden_units, lr, num_epochs in hyperparam_space:
-                print(f"Testing combination: hidden_units={hidden_units}, lr={lr}, num_epochs={num_epochs}")
+            # Train and evaluate the model
+            best_model, best_params, best_history, best_val_acc = train_cnn_with_hyperparameters(
+                train_loader=train_loader,
+                val_loader=val_loader,
+                device=device,
+                hyperparam_space=hyperparam_space,
+                model_path=model_path
+            )
 
-                # Initialize and train the model
-                model = BreastMNISTCNN(hidden_units=hidden_units).to(device)
-                model, history = train_model(model, train_loader, val_loader, device, epochs=num_epochs, lr=lr)
+            # Log results
+            save_cnn_log(
+                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                model="CNN",
+                best_val_acc=best_val_acc,
+                best_params=best_params,
+                classification_report="N/A"  # Will be updated after test evaluation
+            )
 
-                val_acc = max(history["val_acc"])
-
-                if val_acc > best_val_acc:
-                    best_val_acc = val_acc
-                    best_model_state = model.state_dict()
-                    best_params = {"hidden_units": hidden_units, "learning_rate": lr, "num_epochs": num_epochs}
-                    best_history = history
-
-            # Save the best model and hyperparameters
-            os.makedirs("A/models", exist_ok=True)
-            torch.save(best_model_state, model_path)
-            torch.save(best_params, hyperparam_path)
-            print(f"Best model saved to {model_path} with val_acc: {best_val_acc:.4f}")
-            print(f"Best hyperparameters: {best_params}")
-
-            # Load the best model for evaluation
-            model = BreastMNISTCNN(hidden_units=best_params["hidden_units"]).to(device)
-            model.load_state_dict(best_model_state)
-
-        # Evaluate the best model on the test set
+        # Evaluate on test set
         print("Evaluating the model on the test set...")
-        y_true, y_pred = test_model(model, test_loader, device)
+        y_true, y_pred = test_model(best_model, test_loader, device)
 
-        # Save confusion matrix and classification report
-        plot_confusion_matrix(y_true, y_pred, save_dir="figure", file_name="confusion_matrix_cnn.png", class_names=["Benign", "Malignant"])
-
-        report_text = classification_report(y_true, y_pred, target_names=["Benign", "Malignant"])
-        save_training_log_plaintext(
-            {
-                "task": "A",
-                "model": "CNN",
-                "hidden_units": best_params["hidden_units"] if best_params else 128,
-                "learning_rate": best_params["learning_rate"] if best_params else LEARNING_RATE,
-                "num_epochs": best_params["num_epochs"] if best_params else NUM_EPOCHS,
-                "batch_size": BATCH_SIZE
-            },
-            report_text,
-            filename="log.txt"
+        # Generate and print classification report
+        print("\nClassification Report:")
+        report = classification_report(
+            y_true, y_pred, target_names=["Benign", "Malignant"]
         )
-        print("Training log saved to A/log/log.txt")
+        print(report)
 
-        # Plot and save the training history
-        if best_history:
+        # Update log with classification report
+        save_cnn_log(
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            model="CNN",
+            best_val_acc=best_val_acc if 'best_val_acc' in locals() else None,
+            best_params=best_params if 'best_params' in locals() else None,
+            classification_report=report,
+        )
+
+        # Save confusion matrix
+        plot_confusion_matrix(
+            y_true, y_pred, save_dir="figure", file_name="confusion_matrix_cnn.png", class_names=["Benign", "Malignant"]
+        )
+
+        # Save training history plot (if training was performed)
+        if 'best_history' in locals():
             plot_history(best_history, save_dir="figure", file_name="training_history_cnn.png")
-        
+
         # Predict and visualize some samples
-        print("Predicting and visualizing test samples...")
-        predict_and_visualize(model, test_loader, device, class_names=["Benign", "Malignant"], num_samples=9, save_dir="figure", save_file="cnn_predictions.png")
+        predict_and_visualize(best_model, test_loader, device, class_names=["Benign", "Malignant"], num_samples=9, save_dir="figure", save_file="cnn_predictions.png")
         print("Prediction visualization saved!")
 
     except Exception as e:
         print(f"Error in CNN workflow: {e}")
 
-
 def handle_task_a_svm():
-    """Workflow for Task A with SVM."""
+    """
+    Workflow for Task A using SVM with extended hyperparameter tuning and class imbalance handling.
+    """
     try:
-        print("Using SVM with preprocessing and hyperparameter tuning...")
+        print("Using SVM with extended hyperparameter tuning and class imbalance handling...")
+
+        # Load and preprocess the BreastMNIST dataset
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_breastmnist_flat(batch_size=BATCH_SIZE)
-        X_train, X_val, X_test, _, _ = preprocess_data(X_train, X_val, X_test, n_components=N_COMPONENTS)
+        X_train, X_val, X_test, scaler, pca = preprocess_data(X_train, X_val, X_test, n_components=N_COMPONENTS)
 
+        # Handle class imbalance with SMOTE (optional)
+        use_smote = True  # Set to True to apply SMOTE
+        if use_smote:
+            from collections import Counter
+            from imblearn.over_sampling import SMOTE
+            smote = SMOTE(random_state=42)
+            X_train, y_train = smote.fit_resample(X_train, y_train)
+            print("SMOTE applied. Resampled dataset shape:", dict(Counter(y_train)))
+
+        # Define model path
         model_path = "A/models/best_svm_model.pkl"
-        model, best_params = train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path=model_path)
-        y_true, y_pred = test_traditional_model(model, X_test, y_test)
 
-        plot_confusion_matrix(y_true, y_pred, save_dir="A/figure", file_name="confusion_matrix_svm.png", class_names=["Benign", "Malignant"])
-        report_text = classification_report(y_true, y_pred, target_names=["Benign", "Malignant"])
-        save_training_log_plaintext(
-            {"task": "A", "model": "SVM", "kernel": best_params.get('kernel', 'N/A'), "C": best_params.get('C', 'N/A'),
-             "gamma": best_params.get('gamma', 'N/A'), "pca_components": N_COMPONENTS},
-            report_text,
-            filename="A/log/log.txt"
+        # Define an extended parameter grid with class_weight option
+        param_grid = {
+            'C': [0.1, 1, 10],
+            'kernel': ['linear', 'rbf'],
+            'gamma': ['scale', 0.1],
+            'class_weight': [None, 'balanced']  # Include balanced class weights
+        }
+
+        # Check if pretrained model exists
+        if os.path.exists(model_path):
+            print(f"Pretrained SVM model found. Loading model from {model_path}...")
+            model, best_params = joblib.load(model_path), None
+        else:
+            print("No pretrained model found. Starting hyperparameter tuning...")
+
+            # Train SVM with extended GridSearchCV
+            model, best_params = train_svm_with_grid_search(
+                X_train, y_train, X_val, y_val,
+                model_path="A/models/best_svm_model.pkl",
+                param_grid=param_grid
+            )
+
+            print(f"Best SVM model saved to {model_path} with params: {best_params}")
+
+        # Evaluate the model on the test set
+        print("Evaluating the SVM model on the test set...")
+        y_true, y_pred = test_svm(model, X_test, y_test)
+
+        # Save confusion matrix
+        plot_confusion_matrix(
+            y_true, y_pred,
+            save_dir="figure",
+            file_name="confusion_matrix_svm.png",
+            class_names=["Benign", "Malignant"]
         )
-        print("Training log saved to A/log/log.txt")
+
+        # Generate classification report
+        report_text = classification_report(
+            y_true, y_pred,
+            target_names=["Benign", "Malignant"]
+        )
+        print("\nClassification Report:\n", report_text)
+
+        # Plot and save ROC-AUC curve
+        plot_roc_auc(
+            model=model.model,  # Access internal SVC model
+            X_test=X_test,
+            y_test=y_test,
+            save_dir="figure",
+            file_name="roc_auc_svm.png",
+            log_path="A/log/log.txt"
+        )
+
+        # Log results
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        val_accuracy = model.score(X_val, y_val)
+        save_svm_log(
+            timestamp=timestamp,
+            task="A",
+            model="SVM",
+            best_val_acc=val_accuracy,
+            best_params=best_params,
+            classification_report=report_text
+        )
+        print("Results logged successfully!")
 
     except Exception as e:
         print(f"Error in SVM workflow: {e}")
