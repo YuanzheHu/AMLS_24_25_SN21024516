@@ -147,44 +147,6 @@ def preprocess_data(X_train, X_val, X_test, n_components=20):
 
     return X_train, X_val, X_test, scaler, pca
 
-    """
-    Save training details and classification report to a plain text file.
-
-    Args:
-        hyperparameters (dict): Hyperparameters and other training details.
-        classification_report (str): Classification report in plain text format.
-        augmentation (bool): Whether data augmentation was used.
-        save_dir (str): Directory to save the log file.
-        filename (str): Name of the log file to save the report.
-    """
-    os.makedirs(save_dir, exist_ok=True)
-
-    # Define the log file path
-    log_file = os.path.join(save_dir, filename)
-
-    # Prepare log entry
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"""
-Timestamp: {timestamp}
-Task: {hyperparameters.get('task', 'N/A')}
-Model: {hyperparameters.get('model', 'N/A')}
-Kernel: {hyperparameters.get('kernel', 'N/A')}
-Regularization Param: {hyperparameters.get('regularization_param', 'N/A')}
-Num Epochs: {hyperparameters.get('num_epochs', 'N/A')}
-Batch Size: {hyperparameters.get('batch_size', 'N/A')}
-Learning Rate: {hyperparameters.get('learning_rate', 'N/A')}
-Hidden Units: {hyperparameters.get('hidden_units', 'N/A')}
-
-Classification Report:
-{classification_report}
-"""
-    # Write to the log file
-    with open(log_file, "a") as f:
-        f.write(log_entry)
-        f.write("\n" + "-" * 80 + "\n")  # Add a separator for readability
-
-    print(f"Training log saved to {log_file}")
-
 def save_svm_log(timestamp, task, model, best_val_acc, best_params, classification_report, log_path="A/log/log.txt"):
     """
     Save SVM training log to a specified file.

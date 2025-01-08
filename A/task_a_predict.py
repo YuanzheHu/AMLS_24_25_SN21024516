@@ -63,7 +63,7 @@ def predict_and_visualize(model, test_loader, device, class_names=["Benign", "Ma
     plt.savefig(figure_path)
     print(f"Prediction visualization saved to {figure_path}")
 
-def plot_roc_auc(model, X_test, y_test, save_dir="figure", file_name="roc_auc_svm.png", log_path="A/log/log.txt"):
+def plot_roc_auc(model, X_test, y_test, save_dir="A/figure", file_name="roc_auc_svm.png", log_path="A/log/log.txt"):
     """
     Plot and save the ROC-AUC curve for the SVM model.
 
@@ -101,3 +101,37 @@ def plot_roc_auc(model, X_test, y_test, save_dir="figure", file_name="roc_auc_sv
     with open(log_path, "a") as log_file:
         log_file.write(f"ROC-AUC Score: {roc_auc:.4f}\n")
     print(f"ROC-AUC Score: {roc_auc:.4f} logged to {log_path}")
+
+def compare_model_performance_a(svm_scores, cnn_scores, class_labels, metric, save_path):
+    """
+    Generate a bar chart comparing the performance of SVM and CNN.
+
+    Args:
+        svm_scores (list): F1-Scores for SVM across different classes.
+        cnn_scores (list): F1-Scores for CNN across different classes.
+        class_labels (list): Class labels.
+        metric (str): Metric being compared (e.g., F1-Score).
+        save_path (str): Path to save the comparison chart.
+    """
+    # Bar positions
+    x = np.arange(len(class_labels))
+    width = 0.35
+
+    # Create the bar chart
+    plt.figure(figsize=(10, 6))
+    plt.bar(x - width / 2, svm_scores, width, label="SVM", alpha=0.8)
+    plt.bar(x + width / 2, cnn_scores, width, label="CNN", alpha=0.8)
+
+    # Chart details
+    plt.xlabel("Class Labels")
+    plt.ylabel(metric)
+    plt.title(f"Comparison of SVM and CNN Performance ({metric})")
+    plt.xticks(x, class_labels)
+    plt.ylim(0, 1)  # F1-Score range is [0, 1]
+    plt.legend()
+
+    # Save the chart
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+    print(f"Comparison chart saved to {save_path}")

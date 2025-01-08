@@ -287,7 +287,7 @@ def load_best_cnn_model(model_path, device):
     Returns:
         torch.nn.Module: Loaded CNN model.
     """
-    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=True)
     state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
 
     # Extract dimensions from the state_dict

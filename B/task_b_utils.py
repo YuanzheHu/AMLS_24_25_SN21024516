@@ -33,7 +33,7 @@ def load_bloodmnist(batch_size=32, data_dir="B/data"):
 
     return train_loader, val_loader, test_loader
 
-def log_message(message, log_file="B/log/training_log.txt"):
+def log_message(message, log_file="B/log/log.txt"):
     """
     Append a log message to a log file.
 
@@ -79,3 +79,35 @@ def plot_and_save_confusion_matrix(y_true, y_pred, target_names, save_path, log_
     print(f"Confusion matrix saved to {save_path}")
     if log_file:
         log_message(f"Confusion matrix saved to {save_path}", log_file)
+
+def load_vit_bloodmnist(batch_size=32, data_dir="B/data"):
+    """
+    Load the BloodMNIST dataset and return data loaders with preprocessing for ViT.
+
+    Args:
+        batch_size (int): Batch size for DataLoader.
+        data_dir (str): Directory to store dataset.
+
+    Returns:
+        tuple: Train, validation, and test DataLoaders.
+    """
+    os.makedirs(data_dir, exist_ok=True)
+
+    # Preprocessing specific to Vision Transformer
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),  # Resize images to 224x224
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize to [-1, 1]
+    ])
+
+    # Load datasets with the transform
+    train_dataset = BloodMNIST(split='train', transform=transform, download=True, root=data_dir)
+    val_dataset = BloodMNIST(split='val', transform=transform, download=True, root=data_dir)
+    test_dataset = BloodMNIST(split='test', transform=transform, download=True, root=data_dir)
+
+    # Create data loaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    return train_loader, val_loader, test_loader
