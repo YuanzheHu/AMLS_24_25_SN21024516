@@ -1,11 +1,8 @@
-import random
 import torch
-import matplotlib.pyplot as plt
 import os
-
-from A.task_a_utils import load_breastmnist
-from A.task_a_model import BreastMNISTCNN
-from A.task_a_train import load_model
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
 
 def predict_and_visualize(model, test_loader, device, class_names=["Benign", "Malignant"], num_samples=9, save_dir="figure", save_file="predictions.png"):
     """
@@ -65,3 +62,42 @@ def predict_and_visualize(model, test_loader, device, class_names=["Benign", "Ma
     figure_path = os.path.join(save_path, save_file)
     plt.savefig(figure_path)
     print(f"Prediction visualization saved to {figure_path}")
+
+def plot_roc_auc(model, X_test, y_test, save_dir="figure", file_name="roc_auc_svm.png", log_path="A/log/log.txt"):
+    """
+    Plot and save the ROC-AUC curve for the SVM model.
+
+    Args:
+        model: Trained SVM model.
+        X_test (numpy.ndarray): Test features.
+        y_test (numpy.ndarray): True labels.
+        save_dir (str): Directory to save the plot.
+        file_name (str): File name for the saved plot.
+        log_path (str): Path to save the ROC-AUC score in the log.
+    """
+    # Predict probabilities
+    y_prob = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    roc_auc = auc(fpr, tpr)
+
+    # Plot ROC curve
+    plt.figure()
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend(loc="lower right")
+
+    # Ensure save directory exists
+    os.makedirs(save_dir, exist_ok=True)
+    plt.savefig(os.path.join(save_dir, file_name))
+    plt.close()
+    print(f"ROC-AUC curve saved to {os.path.join(save_dir, file_name)}")
+
+    # Log ROC-AUC score
+    with open(log_path, "a") as log_file:
+        log_file.write(f"ROC-AUC Score: {roc_auc:.4f}\n")
+    print(f"ROC-AUC Score: {roc_auc:.4f} logged to {log_path}")

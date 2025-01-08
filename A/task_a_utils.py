@@ -1,11 +1,11 @@
 import os
-import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
-import medmnist
 from medmnist import BreastMNIST
 import numpy as np
 from datetime import datetime
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 def load_breastmnist(batch_size=32, download=True, data_dir="data"):
     """
@@ -120,7 +120,33 @@ def load_breastmnist_flat(batch_size=32, download=True):
 
     return (X_train, y_train), (X_val, y_val), (X_test, y_test)
 
-def save_training_log_plaintext(hyperparameters, classification_report, augmentation=False, save_dir="A/log", filename="training_log.txt"):
+def preprocess_data(X_train, X_val, X_test, n_components=20):
+    """
+    Standardize the data and reduce dimensionality using PCA.
+
+    Args:
+        X_train (numpy.ndarray): Training features.
+        X_val (numpy.ndarray): Validation features.
+        X_test (numpy.ndarray): Test features.
+        n_components (int): Number of PCA components.
+
+    Returns:
+        tuple: Transformed (X_train, X_val, X_test), scaler and PCA objects.
+    """
+    # Standardize the data
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_val = scaler.transform(X_val)
+    X_test = scaler.transform(X_test)
+
+    # Reduce dimensions with PCA
+    pca = PCA(n_components=n_components)
+    X_train = pca.fit_transform(X_train)
+    X_val = pca.transform(X_val)
+    X_test = pca.transform(X_test)
+
+    return X_train, X_val, X_test, scaler, pca
+
     """
     Save training details and classification report to a plain text file.
 
@@ -158,3 +184,61 @@ Classification Report:
         f.write("\n" + "-" * 80 + "\n")  # Add a separator for readability
 
     print(f"Training log saved to {log_file}")
+
+def save_svm_log(timestamp, task, model, best_val_acc, best_params, classification_report, log_path="A/log/log.txt"):
+    """
+    Save SVM training log to a specified file.
+
+    Args:
+        timestamp (str): Timestamp of the log entry.
+        task (str): Task identifier (e.g., "A").
+        model (str): Model name (e.g., "SVM").
+        best_val_acc (float): Best validation accuracy achieved.
+        best_params (dict): Best hyperparameters for the model.
+        classification_report (str): Classification report text.
+        log_path (str): Path to the log file (default: "A/log/log.txt").
+    """
+    log_entry = f"""
+Timestamp: {timestamp}
+Task: {task}
+Model: {model}
+Best Validation Accuracy: {best_val_acc:.4f}
+Best Parameters: {best_params}
+Classification Report:
+{classification_report}
+"""
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    with open(log_path, "a") as log_file:
+        log_file.write(log_entry)
+        log_file.write("\n" + "-" * 80 + "\n")
+    print(f"Training log saved to {log_path}")
+
+def save_cnn_log(timestamp, model, best_val_acc, best_params, log_path="A/log/log.txt", classification_report=None):
+    """
+    Save CNN training log to a specified file.
+
+    Args:
+        timestamp (str): Timestamp of the log entry.
+        model (str): Model name (e.g., "CNN").
+        best_val_acc (float or None): Best validation accuracy achieved.
+        best_params (dict): Best hyperparameters for the model.
+        log_path (str): Path to the log file (default: "A/log/cnn_log.txt").
+        classification_report (str): Classification report text.
+    """
+    # Format best_val_acc if it's not None
+    val_acc_str = f"{best_val_acc:.4f}" if best_val_acc is not None else "N/A"
+
+    # Format log entry
+    log_entry = f"""
+Timestamp: {timestamp}
+Model: {model}
+Best Validation Accuracy: {val_acc_str}
+Best Parameters: {best_params}
+Classification Report:
+{classification_report if classification_report else "N/A"}
+"""
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    with open(log_path, "a") as log_file:
+        log_file.write(log_entry)
+        log_file.write("\n" + "-" * 80 + "\n")
+    print(f"Training log saved to {log_path}")
