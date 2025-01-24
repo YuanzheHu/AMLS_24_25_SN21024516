@@ -12,14 +12,15 @@ Medical imaging plays a crucial role in modern healthcare by enabling accurate d
 #### BreastMNIST
 BreastMNIST includes ultrasound scans of breast tumors, labeled as either benign (non-cancerous) or malignant (cancerous):
 
-![BreastMNIST Samples](A/figure/breastmnist.png)
+<img src="A/figure/breastmnist.png" alt="BreastMNIST Samples" width="400">
 
 #### BloodMNIST
 BloodMNIST consists of 8 blood cell types, such as basophils, eosinophils, and neutrophils. Below are some representative samples from the dataset:
 
-![BloodMNIST Samples](A/figure/bloodmnist.png)
+<img src="A/figure/bloodmnist.png" alt="BloodMNIST Samples" width="400">
 
 ---
+
 
 ## **Setup Instructions**
 
