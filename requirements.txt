@@ -65,6 +65,7 @@ termcolor==2.5.0
 threadpoolctl
 tifffile==2024.8.30
 torch==2.5.1
+torchinfo
 torchvision==0.20.1
 tornado
 tqdm==4.67.1
