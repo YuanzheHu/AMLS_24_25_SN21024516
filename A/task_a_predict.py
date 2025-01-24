@@ -102,6 +102,52 @@ def plot_roc_auc(model, X_test, y_test, save_dir="A/figure", file_name="roc_auc_
         log_file.write(f"ROC-AUC Score: {roc_auc:.4f}\n")
     print(f"ROC-AUC Score: {roc_auc:.4f} logged to {log_path}")
 
+
+def plot_roc_auc_cnn(model, test_loader, device, save_dir, file_name, log_path):
+    """
+    Plots the ROC-AUC curve for the CNN model and logs the ROC-AUC score.
+    """
+    model.eval()
+    y_true = []
+    y_scores = []
+
+    # Iterate over the test loader to calculate predictions
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+
+            # Assuming the model outputs logits
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            y_scores.extend(probabilities[:, 1].cpu().numpy())  # Probabilities for class 1 ("Malignant")
+            y_true.extend(labels.cpu().numpy())
+
+    y_true = np.array(y_true)
+    y_scores = np.array(y_scores)
+
+    # Compute ROC curve and AUC
+    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+    roc_auc = auc(fpr, tpr)
+
+    # Plot the ROC curve
+    plt.figure()
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f"ROC curve (area = {roc_auc:.2f})")
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')  # Diagonal line
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("Receiver Operating Characteristic (ROC)")
+    plt.legend(loc="lower right")
+    plt.grid()
+    plt.savefig(f"{save_dir}/{file_name}")
+    plt.close()
+
+    print(f"ROC-AUC curve saved to {save_dir}/{file_name}")
+
+    # Log ROC-AUC score
+    with open(log_path, "a") as log_file:
+        log_file.write(f"ROC-AUC Score: {roc_auc:.4f}\n")
+    print(f"ROC-AUC Score: {roc_auc:.4f} logged to {log_path}")
+
 def compare_model_performance_a(svm_scores, cnn_scores, class_labels, metric, save_path):
     """
     Generate a bar chart comparing the performance of SVM and CNN.

@@ -7,6 +7,7 @@ from datetime import datetime
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
+    
 def load_breastmnist(batch_size=32, download=True, data_dir="data"):
     """
     Load the BreastMNIST dataset without data augmentation and save to a specified directory.
@@ -31,47 +32,6 @@ def load_breastmnist(batch_size=32, download=True, data_dir="data"):
     train_dataset = BreastMNIST(split='train', transform=transform, download=download, root=data_dir)
     val_dataset = BreastMNIST(split='val', transform=transform, download=download, root=data_dir)
     test_dataset = BreastMNIST(split='test', transform=transform, download=download, root=data_dir)
-
-    # Create DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    return train_loader, val_loader, test_loader
-
-def load_breastmnist_augmented(batch_size=32, download=True, data_dir="data"):
-    """
-    Load the BreastMNIST dataset with data augmentation and save to a specified directory.
-
-    Args:
-        batch_size (int): Batch size for DataLoader.
-        download (bool): Whether to download the dataset.
-        data_dir (str): Directory to save the dataset.
-
-    Returns:
-        tuple: Train, validation, and test DataLoaders.
-    """
-    os.makedirs(data_dir, exist_ok=True)
-
-    # Data augmentation for training set
-    transform_train = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.RandomRotation(30),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize to [-1, 1]
-    ])
-
-    # Simple normalization for validation and test sets
-    transform_val_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize to [-1, 1]
-    ])
-
-    # Load datasets
-    train_dataset = BreastMNIST(split='train', transform=transform_train, download=download, root=data_dir)
-    val_dataset = BreastMNIST(split='val', transform=transform_val_test, download=download, root=data_dir)
-    test_dataset = BreastMNIST(split='test', transform=transform_val_test, download=download, root=data_dir)
 
     # Create DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)

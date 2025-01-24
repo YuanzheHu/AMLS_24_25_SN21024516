@@ -1,6 +1,6 @@
 # Standard Library
 import os
-from datetime import datetime
+from datetime import datetime            
 
 # Third-Party Libraries
 import joblib
@@ -16,7 +16,7 @@ from A.task_a_train import (
     plot_history, test_model, plot_confusion_matrix, train_cnn_with_hyperparameters,
     load_best_cnn_model, train_svm_with_grid_search, test_svm
 )
-from A.task_a_predict import predict_and_visualize, plot_roc_auc, compare_model_performance_a
+from A.task_a_predict import predict_and_visualize, plot_roc_auc, plot_roc_auc_cnn,compare_model_performance_a
 
 # Task B Utilities
 from B.task_b_utils import (
@@ -32,7 +32,7 @@ NUM_EPOCHS = 10
 BATCH_SIZE = 32
 HIDDEN_UNITS = 128
 LEARNING_RATE = 0.001
-N_COMPONENTS = 15  # PCA components for SVM
+N_COMPONENTS = 20  # PCA components for SVM
 
 def setup_directories():
     """Ensure necessary directories exist for Task A and Task B."""
@@ -101,6 +101,15 @@ def handle_task_a_cnn():
         )
         print(report)
 
+        plot_roc_auc_cnn(
+            model=best_model,
+            test_loader=test_loader,
+            device=device,
+            save_dir="A/figure",
+            file_name="roc_auc_cnn.png",
+            log_path="A/log/log.txt"
+        )
+
         # Update log with classification report
         save_cnn_log(
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -118,6 +127,7 @@ def handle_task_a_cnn():
         # Save training history plot (if training was performed)
         if 'best_history' in locals():
             plot_history(best_history, save_dir="figure", file_name="training_history_cnn.png")
+        
 
         # Predict and visualize some samples
         predict_and_visualize(best_model, test_loader, device, class_names=["Benign", "Malignant"], num_samples=9, save_dir="figure", save_file="cnn_predictions.png")
@@ -138,24 +148,16 @@ def handle_task_a_svm():
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_breastmnist_flat(batch_size=BATCH_SIZE)
         X_train, X_val, X_test, scaler, pca = preprocess_data(X_train, X_val, X_test, n_components=N_COMPONENTS)
 
-        # Handle class imbalance with SMOTE (optional)
-        use_smote = True  # Set to True to apply SMOTE
-        if use_smote:
-            from collections import Counter
-            from imblearn.over_sampling import SMOTE
-            smote = SMOTE(random_state=42)
-            X_train, y_train = smote.fit_resample(X_train, y_train)
-            print("SMOTE applied. Resampled dataset shape:", dict(Counter(y_train)))
-
         # Define model path
         model_path = "A/models/best_svm_model.pkl"
 
         # Define an extended parameter grid with class_weight option
         param_grid = {
-            'C': [0.1, 1, 10],
-            'kernel': ['linear', 'rbf'],
-            'gamma': ['scale', 0.1],
-            'class_weight': [None, 'balanced']  # Include balanced class weights
+            'C': [0.1, 1, 10],  # A range that captures more regularization options
+            'kernel': ['linear', 'rbf', 'poly'],  # Focus on commonly used kernels
+            'gamma': ['scale', 'auto'],  # Add more granularity for gamma
+            'degree': [2, 3],  # Include lower-degree polynomials for 'poly' kernel
+            'class_weight': [None, 'balanced'], 
         }
 
         # Check if pretrained model exists

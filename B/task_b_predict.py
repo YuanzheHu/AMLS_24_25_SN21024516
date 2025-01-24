@@ -22,16 +22,16 @@ def predict_and_visualize_resnet(
     # Ensure save directory exists
     os.makedirs(save_dir, exist_ok=True)
 
-    # Custom class names (example: abbreviations or simplified names)
+    # Custom class names (abbreviations)
     class_names = {
-        0: "RBC",
-        1: "WBC",
-        2: "Platelets",
-        3: "Lymphocytes",
-        4: "Monocytes",
-        5: "Eosinophils",
-        6: "Basophils",
-        7: "Others"
+        0: "BAS",
+        1: "EOS",
+        2: "ERY",
+        3: "IG",
+        4: "LYM",
+        5: "MON",
+        6: "NEU",
+        7: "PLT"
     }
 
     # Collect predictions
@@ -72,9 +72,8 @@ def predict_and_visualize_resnet(
     plt.savefig(os.path.join(save_dir, save_file))
     print(f"Prediction visualization saved to {os.path.join(save_dir, save_file)}")
 
-
 def compare_model_performance(
-    resnet_scores, vit_scores, class_labels, metric="F1-Score", save_path="B/figure/comparison.png"
+    resnet_scores, vit_scores, class_labels=None, metric="F1-Score", save_path="B/figure/comparison.png"
 ):
     """
     Compare performance between ResNet and ViT models using a bar chart.
@@ -82,21 +81,21 @@ def compare_model_performance(
     Args:
         resnet_scores (list): Scores (e.g., F1-Score) for ResNet on each class.
         vit_scores (list): Scores (e.g., F1-Score) for ViT on each class.
-        class_labels (list): Labels for the classes.
+        class_labels (list): Labels for the classes. If None, default labels will be used.
         metric (str): Metric name (e.g., "F1-Score").
         save_path (str): Path to save the comparison chart.
     """
     assert len(resnet_scores) == len(vit_scores), "Score lists must have the same length."
     if class_labels is None:
-        class_labels = [f"Class {i}" for i in range(len(resnet_scores))]
+        class_labels = [f"Class {i+1}" for i in range(len(resnet_scores))]
 
     # X-axis positions for the classes
     x = np.arange(len(class_labels))
     width = 0.35  # Width of the bars
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    bar1 = ax.bar(x - width / 2, resnet_scores, width, label="ResNet", alpha=0.8, color="blue")
-    bar2 = ax.bar(x + width / 2, vit_scores, width, label="ViT", alpha=0.8, color="orange")
+    bar1 = ax.bar(x - width / 2, resnet_scores, width, label="ResNet", alpha=0.8)
+    bar2 = ax.bar(x + width / 2, vit_scores, width, label="ViT", alpha=0.8)
 
     # Add labels, title, and legend
     ax.set_xlabel("Class Labels")

@@ -202,23 +202,7 @@ def plot_history(history, save_dir="figure", file_name="training_history.png"):
     figure_path = os.path.join(save_path, file_name)
     plt.savefig(figure_path)
     print(f"Figure saved to {figure_path}")
-
-    """
-    Load a trained model from file.
-
-    Args:
-        model (nn.Module): The CNN model to load weights into.
-        model_path (str): Path to the saved model file.
-        device (torch.device): Device to load the model on.
-
-    Returns:
-        model: Model with loaded weights.
-    """
-    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-    model = model.to(device)
-    print(f"Model loaded from {model_path}")
-    return model
-
+    
 def test_model(model, test_loader, device):
     """
     Test the CNN model and generate a classification report.
@@ -329,7 +313,7 @@ def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/mod
 
     print("No pretrained model found. Starting hyperparameter tuning...")
 
-    # Initialize progress bar
+     # Initialize progress bar
     param_combinations = [
         {'C': c, 'kernel': k, 'gamma': g, 'class_weight': cw}
         for c in param_grid['C']
@@ -343,6 +327,7 @@ def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/mod
     best_score = 0
     best_params = None
     best_model = None
+    validation_scores = []
 
     for params in param_combinations:
         print(f"Testing parameters: {params}")
@@ -355,6 +340,7 @@ def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/mod
 
         # Evaluate the model
         val_score = current_model.score(X_val, y_val)
+        validation_scores.append(val_score)
         print(f"Validation score: {val_score:.4f}")
 
         if val_score > best_score:
@@ -370,8 +356,32 @@ def train_svm_with_grid_search(X_train, y_train, X_val, y_val, model_path="A/mod
     joblib.dump(best_model, model_path)
     print(f"Best model saved to {model_path} with validation accuracy: {best_score:.4f}")
 
+    # Plot validation scores
+    plot_validation_scores(validation_scores, total_combinations)
+
     return best_model, best_params
 
+def plot_validation_scores(validation_scores, total_combinations, save_dir="A/figure", file_name="validation_scores.png"):
+    """
+    Plot and save the validation scores during grid search.
+
+    Args:
+        validation_scores (list): Validation scores for each parameter combination.
+        total_combinations (int): Total number of parameter combinations.
+        save_dir (str): Directory to save the plot.
+        file_name (str): Name of the plot file.
+    """
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(total_combinations), validation_scores, marker='o')
+    plt.title('Validation Scores during Grid Search')
+    plt.xlabel('Parameter Combination Index')
+    plt.ylabel('Validation Score')
+    plt.grid(True)
+
+    # Save the plot
+    os.makedirs(save_dir, exist_ok=True)
+    plt.savefig(os.path.join(save_dir, file_name))
+   
 def test_svm(model, X_test, y_test, class_names=["Benign", "Malignant"]):
     """
     Test a traditional ML model and generate a classification report.

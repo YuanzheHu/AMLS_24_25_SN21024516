@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+from torchinfo import summary
 from torchvision.models import resnet18, ResNet18_Weights
 from torchvision.models import vit_b_16, ViT_B_16_Weights
 
@@ -51,3 +53,26 @@ def get_vit_model(num_classes=8):
     model = vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_V1)
     model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)  # Modify output layer
     return model
+
+if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Create an instance of the ResNet model
+    resnet_model = get_resnet_model().to(device)
+
+    # Show the architecture of the ResNet model using torchinfo
+    resnet_summary = summary(resnet_model, input_size=(1, 3, 28, 28))
+
+    # Write the ResNet summary to a file
+    with open('models/resnet_summary.txt', 'w') as f:
+        f.write(str(resnet_summary))
+
+    # Create an instance of the ViT model
+    vit_model = get_vit_model().to(device)
+
+    # Show the architecture of the ViT model using torchinfo
+    vit_summary = summary(vit_model, input_size=(1, 3, 224, 224))
+
+    # Write the ViT summary to a file
+    with open('models/vit_summary.txt', 'w') as f:
+        f.write(str(vit_summary))
